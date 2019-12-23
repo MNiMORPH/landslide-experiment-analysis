@@ -12,6 +12,8 @@ from shapely.geometry import Point
 import pandas as pd
 plt.ion()
 
+_save = True
+
 def recursive_glob(rootdir='.', pattern='*'):
 	"""Search recursively for files matching a specified pattern.
 	
@@ -32,7 +34,7 @@ for filename in filenames:
     frames.append(pd.read_csv(filename))
 
 for frame in frames:
-    print np.max(frame['Runtime_seconds'])/3600.
+    print np.max(frame['runtime [s]'])/3600.
 
 data = pd.concat(frames)
 
@@ -55,7 +57,7 @@ def normFit(x, mu, s2):
 
 cdla = 400E-6
 
-n, bins = np.histogram(data['area'], bins=np.logspace(np.log10(0.00012), np.log10(0.66), 26))
+n, bins = np.histogram(data['area [m2]'], bins=np.logspace(np.log10(0.00012), np.log10(0.66), 26))
 mag = (bins[:-1] + bins[1:])/2.
 freq = n/float(np.sum(n))/np.diff(bins)
 
@@ -74,7 +76,8 @@ plt.tick_params(axis='both', which='major', labelsize=18)
 plt.ylabel('$f$ [m$^{-2}$]', fontsize=24)
 plt.xlabel('$A$ [m$^{2}$]', fontsize=24)
 plt.tight_layout()
-plt.savefig('Af_linear.svg')
+if _save:
+    plt.savefig('Af_linear.svg')
 
 # Log plot
 plt.figure()
@@ -87,7 +90,8 @@ plt.ylabel('Probability density $f$ [m$^{-2}$]', fontsize=16)
 plt.xlabel('Landslide area $A$ [m$^2$]', fontsize=16)
 plt.tick_params(axis='both', which='major', labelsize=12)
 plt.tight_layout()
-plt.savefig('Af_log.svg')
+if _save:
+    plt.savefig('Af_log.svg')
 
 
 ###############
@@ -97,10 +101,10 @@ plt.savefig('Af_log.svg')
 def plFit(x, a, b):
     return a*x**b
 
-popt, pcov = curve_fit(plFit, data['area'], data['volume'])
+popt, pcov = curve_fit(plFit, data['area [m2]'], data['volume [m3]'])
 
 plt.figure(figsize=(6.4,4.8*.85)) # new default is 6.4, 4.8
-plt.loglog(data['area'], data['volume'], marker='o', color = '0', alpha=.2, linestyle='None')
+plt.loglog(data['area [m2]'], data['volume [m3]'], marker='o', color = '0', alpha=.2, linestyle='None')
 _x = np.logspace( np.log10(plt.xlim()[0]), np.log10(plt.xlim()[1]), 100 )
 plt.loglog(_x, plFit(_x, *popt), '-', color='.75', linewidth=2)
 plt.ylabel('Landslide volume $V$ [m$^{-2}$]', fontsize=16)
@@ -109,15 +113,16 @@ plt.tick_params(axis='both', which='major', labelsize=12)
 plt.text(1E-2, 4E-6, '$V$ = '+'%.2f' %popt[0]+'$A^{'+'%.2f' %popt[1]+'}$', fontsize=16)
 plt.tight_layout()
 
-plt.savefig('AV_log.svg')
+if _save:
+    plt.savefig('AV_log.svg')
 
 
 #############
 # LAG TIMES #
 #############
 
-wts = np.array(data['Wait_time_seconds'])
-wts_blc = wts[data['Runtime_seconds'] < (4*3600)] # base-level constant
+wts = np.array(data['wait time [s]'])
+wts_blc = wts[data['runtime [s]'] < (4*3600)] # base-level constant
 wts = wts[np.isfinite(wts)]
 wts_blc = wts_blc[np.isfinite(wts_blc)]
 # Looks like they are the same! Great.
@@ -198,7 +203,8 @@ plt.ylabel('Number of landslides', fontsize=16)
 plt.tick_params(axis='both', which='major', labelsize=12)
 plt.tight_layout()
 
-plt.savefig('LagTimes.svg')
+if _save:
+    plt.savefig('LagTimes.svg')
 
 
 # PROBABILITY DENSITY INSTEAD
@@ -226,7 +232,8 @@ plt.ylabel('Number of landslides', fontsize=16)
 plt.tick_params(axis='both', which='major', labelsize=12)
 plt.tight_layout()
 
-plt.savefig('LagTimes_probDensity.svg')
+if _save:
+    plt.savefig('LagTimes_probDensity.svg')
 
 
 
@@ -237,11 +244,11 @@ plt.savefig('LagTimes_probDensity.svg')
 
 rho = 2650 * .65 + .1 * 1000
 g = 9.8
-CohesionBlockFall_simple = rho * g * data['width']
+CohesionBlockFall_simple = rho * g * data['width [m]']
 n, bins = np.histogram(CohesionBlockFall_simple, bins=np.arange(0, 3201, 100))
 mag = (bins[:-1] + bins[1:])/2.
 freq = n/float(np.sum(n))/np.diff(bins)
-plt.bar(bins[:-1], freq, width=np.diff(bins), ec='.8', fc='.8', align="edge", alpha=.2)
+#plt.bar(bins[:-1], freq, width=np.diff(bins), ec='.8', fc='.8', align="edge", alpha=.2)
 
 # Shear stress vs. probability density
 plt.figure(figsize=(6.4,4.8*.85)) # new default is 6.4, 4.8
@@ -276,7 +283,8 @@ plt.tick_params(axis='both', which='major', labelsize=12)
 # Done!
 plt.tight_layout()
 
-plt.savefig('StressWidth.svg')
+if _save:
+    plt.savefig('StressWidth.svg')
 
 # LOOK UP SHEFFIELD THESIS 2015
 # Sticking with Lu2009 and using internal friction angle + tensile strength to obtain cohesion
@@ -285,4 +293,8 @@ plt.savefig('StressWidth.svg')
 #plt.figure()
 #plt.
 
-
+if not _save:
+    plt.show()
+else:
+    plt.close()
+    
