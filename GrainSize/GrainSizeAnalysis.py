@@ -4,6 +4,8 @@ from scipy import special
 from scipy.optimize import curve_fit
 from matplotlib import pyplot as plt
 
+savefig=False
+
 data = np.genfromtxt('GrainSize', delimiter='\t', skip_header=1)
 
 def cdfGaussian(x, mean, SD):
@@ -20,7 +22,8 @@ plt.plot(x, cdfGaussian(x, popt[0], popt[1]), 'k-')
 plt.xlabel('Grain size [mm]', fontsize=18)
 plt.ylabel('Cumulative frequency', fontsize=18)
 plt.tight_layout()
-plt.savefig('GrainSizeDistribution_AGS_100-140.pdf')
-plt.savefig('GrainSizeDistribution_AGS_100-140.png')
-plt.savefig('GrainSizeDistribution_AGS_100-140.svg')
+if savefig:
+    plt.savefig('GrainSizeDistribution_AGS_100-140.pdf')
+    plt.savefig('GrainSizeDistribution_AGS_100-140.png')
+    plt.savefig('GrainSizeDistribution_AGS_100-140.svg')
 plt.show()
