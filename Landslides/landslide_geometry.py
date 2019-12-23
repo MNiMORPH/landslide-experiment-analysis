@@ -30,27 +30,45 @@ def PolyArea(x,y):
     """
     return 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
 
-def EllipseFit_LSwidth(xy):
+def EllipseFit_LS(xy):
     lsqe = el.LSqEllipse()
     lsqe.fit([xy[:,0], xy[:,1]])
-    angle = lsqe.phi # CCW angle b/t x-axis and longer semi-major axis
+    if np.iscomplex(lsqe.width):
+        print "WARN: COMPLEX"
+        lsqe.width = np.nan
+    if np.iscomplex(lsqe.height):
+        print "WARN: COMPLEX"
+        lsqe.height = np.nan
+    if np.iscomplex(lsqe.phi):
+        print "WARN: COMPLEX"
+        lsqe.phi = np.nan
+    if np.iscomplex(lsqe.center).any():
+        print "WARN: COMPLEX"
+        lsqe.center = np.array([np.nan, np.nan])
+    # "width" and "height" are really half-width and half-height.
+    smaja = np.max((lsqe.width, lsqe.height))
+    smina = np.min((lsqe.width, lsqe.height))
+    angle = lsqe.phi # CCW angle b/t x-axis and "width"
+    if smaja == lsqe.height:
+        if angle <= 0:
+            angle += np.pi/2.
+        else:
+            angle -= np.pi/2.
+    angle *= 180/np.pi
+    # Assuming N-S is direction straight to river
+    ls_width = 2 * ( lsqe.width**2 * np.cos(np.pi/2. - lsqe.phi)**2 +
+                     lsqe.height**2 * np.sin(np.pi/2. - lsqe.phi)**2 )**.5
+    ls_length = 2 * ( lsqe.width**2 * np.sin(np.pi/2. - lsqe.phi)**2 +
+                      lsqe.height**2 * np.cos(np.pi/2. - lsqe.phi)**2 )**.5
+        
+    """
     if np.abs(angle) < np.pi/4.:
-        width = 2 * lsqe.height # shorter semi-major axis
+        width = 2 * lsqe.height # semi-minor axis
     else:
-        width = 2 * lsqe.width # longer semi-major axis
-    return width
-
-def EllipseFit_LSlength(xy):
-    lsqe = el.LSqEllipse()
-    lsqe.fit([xy[:,0], xy[:,1]])
-    angle = lsqe.phi # CCW angle b/t x-axis and longer semi-major axis
-    if np.abs(angle) < np.pi/4.:
-        length = 2 * lsqe.width # longer semi-major axis
-    else:
-        length = 2 * lsqe.height # shorter semi-major axis
-    return length
-
-# Run inside root dir for each experiment
+        width = 2 * lsqe.width # semi-major axis
+    """
+    return lsqe.center[0], lsqe.center[1], smaja, smina, angle, ls_width, \
+           ls_length
 
 
 ####################
@@ -61,135 +79,138 @@ shapefiles = sorted(recursive_glob(pattern='*.shp'))
 DEMs = sorted(recursive_glob(pattern='DEM_fullextent_*.tif'))
 
 
-try:
-    data = pd.read_csv('LandslideSizes.txt')
+#try:
+#    data = pd.read_csv('LandslideSizes.txt')
+#
+#except:
 
-except:
-    ##########################
-    # LANDSLIDE AREA & WIDTH #
-    ##########################
+##########################
+# LANDSLIDE AREA & WIDTH #
+##########################
 
-    areas = []
-    widths = []
-    lengths = []
-    lstime = []
-    for filename in shapefiles:
-        try:
-            sf = shapefile.Reader(filename)
-            print filename
-            shapes = sf.shapes()
-            for shape in shapes:
-                points = np.array(shape.points)
-                widths.append( EllipseFit_LSwidth(points) ) # [m]
-                lengths.append( EllipseFit_LSlength(points) ) # [m]
-                areas.append( PolyArea(points[:,0], points[:,1]) ) # [m**2]
-                # Timing of landslides -- experiment-agnostic
-                timestr = filename.split('/')[-1].split('.')[0]
-                lstime.append(int(timestr))
-        except:
-            print "FAILED:", filename
-    areas = np.array(areas)
-    widths = np.array(widths)
-    lengths = np.array(lengths)
-    lstime = np.array(lstime)
+areas = []
+widths = []
+lengths = []
+semimajor_axes = []
+semiminor_axes = []
+angles_semimajor_axis_to_horizontal = []
+x_center = []
+y_center = []
+lstime = []
+for filename in shapefiles:
+    sf = shapefile.Reader(filename)
+    print filename
+    shapes = sf.shapes()
+    for shape in shapes:
+        points = np.array(shape.points)
+        _x_center, _y_center, _smaja, _smina, _angle, _ls_width, \
+         _ls_length = EllipseFit_LS(points)
+        x_center.append(_x_center)
+        y_center.append(_y_center)
+        widths.append( _ls_width ) # [m]
+        lengths.append( _ls_length ) # [m]
+        semimajor_axes.append( _smaja )
+        semiminor_axes.append( _smina )
+        angles_semimajor_axis_to_horizontal.append( _angle )
+        areas.append( PolyArea(points[:,0], points[:,1]) ) # [m**2]
+        # Timing of landslides -- experiment-agnostic
+        timestr = filename.split('/')[-1].split('.')[0]
+        lstime.append(int(timestr))
+areas = np.array(areas)
+widths = np.array(widths)
+lengths = np.array(lengths)
+lstime = np.array(lstime)
+waiting = np.diff(lstime)
+waiting = np.hstack(([np.nan], waiting)) # ignoring first, no earlier landslide
 
+###############################
+# DEM-BASED LANDSLIDE VOLUMES #
+###############################
 
-    ###############################
-    # DEM-BASED LANDSLIDE VOLUMES #
-    ###############################
+#Scan times
+dem_seconds = []
+for dem in DEMs:
+    seconds = dem.split('.')[-2].split('_')[-1]
+    dem_seconds.append(int(seconds))
+dem_seconds = np.array(dem_seconds)
 
-    #Scan times
-    dem_seconds = []
-    for dem in DEMs:
-        seconds = dem.split('.')[-2].split('_')[-1]
-        dem_seconds.append(int(seconds))
-    dem_seconds = np.array(dem_seconds)
+#shapefile times    
+landslide_seconds = []
+for sfile in shapefiles:
+    shp_seconds = sfile.split('/')[-1].split('.')[0]
+    landslide_seconds.append(int(shp_seconds))
+landslide_seconds = np.array(landslide_seconds)
 
-    #shapefile times    
-    landslide_seconds = []
-    for sfile in shapefiles:
-        shp_seconds = sfile.split('/')[-1].split('.')[0]
-        landslide_seconds.append(int(shp_seconds))
-    landslide_seconds = np.array(landslide_seconds)
+#choose the correct DEM 
+previous_dem = []
+for i in range(len(landslide_seconds)):
+    dems_before_landslide = dem_seconds < landslide_seconds[i]
+    previous_dem_time = np.max(dem_seconds[dems_before_landslide])
+    previous_dem.append('DEMs/DEM_fullextent_'+str(previous_dem_time).zfill(7)+'.tif')
 
-    #choose the correct DEM 
-    previous_dem = []
-    for i in range(len(landslide_seconds)):
-        dems_before_landslide = dem_seconds < landslide_seconds[i]
-        previous_dem_time = np.max(dem_seconds[dems_before_landslide])
-        previous_dem.append('DEMs/DEM_fullextent_'+str(previous_dem_time).zfill(7)+'.tif')
-
-    # GeoTIFF
-    # how do I use the previous_dem with the shapefiles to get volume
-    vol = []
-    time = []
-    for i in range(len(previous_dem)):
-        previous = previous_dem[i]
-        filename = shapefiles[i]   
-        print previous
-        ds = gdal.Open(previous)
-        DEM = ds.ReadAsArray() #..... (from previous time)
-        outarray = np.zeros(DEM.shape)  
-        nY, nX = np.array(DEM.shape)
-        Y = np.arange(0, nY, 1)[::-1]/1000.
-        X = np.arange(0, nX, 1)/1000.
-        sf = shapefile.Reader(filename)
-        print filename
-        shapes = sf.shapes()
-        filename_time = filename.split('/')[-1].split('.')[0]
-        time.append(filename_time)
-        for shape in shapes:
-            bbox = np.ceil(np.array(shape.bbox)*1E3)/1E3
-            poly = Polygon(shape.points)
-            x = np.round(np.arange(bbox[0], bbox[2], 0.001), 3)
-            y = np.round(np.arange(bbox[1], bbox[3], 0.001), 3)
-            #X, Y = np.meshgrid(x, y)
-            #for xi in range(len(x)):
-            #    for yi in range(len(y)):
-            for xi in x:
-                for yi in y:
-                    if poly.contains(Point(xi, yi)):
-                        # Export the height above the minimum cell
-                        # in the y-direiction at that x-location
-                        # Should be lowest cell in valley
-                        outarray[Y == yi, X == xi] = DEM[Y == yi, X == xi] - np.nanmin(DEM[:, X == xi])
-            volume = np.nansum(outarray)/1E6 # mm cells to m, check DEM height. probably have to change since height has been changed
-            vol.append(volume)
-    volumes = np.array(vol)
-    depths = volumes/areas
-
-    outdata = pd.DataFrame( columns=['width', 'length', 'depth', 'area', 'volume', 'runtime_seconds'] )
-    outdata['width'] = widths
-    outdata['length'] = lengths
-    outdata['depth'] = depths
-    outdata['area'] = areas
-    outdata['volume'] = volumes
-    outdata['runtime_seconds'] = volumes
-    #outdata.to_csv('LandslideSizes.txt') 
-
-    data = outdata
-
-#########################
-# RUNTIME OF LANDSLIDES #
-#########################
-
-runtimes_seconds = []
-for i in range(len(shapefiles)):
+# GeoTIFF
+# how do I use the previous_dem with the shapefiles to get volume
+vol = []
+time = []
+for i in range(len(previous_dem)):
+    previous = previous_dem[i]
     filename = shapefiles[i]   
+    print previous
+    ds = gdal.Open(previous)
+    DEM = ds.ReadAsArray() #..... (from previous time)
+    outarray = np.zeros(DEM.shape)  
+    nY, nX = np.array(DEM.shape)
+    Y = np.arange(0, nY, 1)[::-1]/1000.
+    X = np.arange(0, nX, 1)/1000.
     sf = shapefile.Reader(filename)
     print filename
     shapes = sf.shapes()
     filename_time = filename.split('/')[-1].split('.')[0]
+    time.append(filename_time)
     for shape in shapes:
-        runtimes_seconds.append(int(filename_time))
-runtimes_seconds = np.array(runtimes_seconds)
-waiting = np.diff(runtimes_seconds)
-waiting[waiting == 0] += 10
-waiting = np.hstack(([np.nan], waiting)) # ignoring first, since no landslide before to compare against
+        bbox = np.ceil(np.array(shape.bbox)*1E3)/1E3
+        poly = Polygon(shape.points)
+        x = np.round(np.arange(bbox[0], bbox[2], 0.001), 3)
+        y = np.round(np.arange(bbox[1], bbox[3], 0.001), 3)
+        #X, Y = np.meshgrid(x, y)
+        #for xi in range(len(x)):
+        #    for yi in range(len(y)):
+        for xi in x:
+            for yi in y:
+                if poly.contains(Point(xi, yi)):
+                    # Export the height above the minimum cell
+                    # in the y-direiction at that x-location
+                    # Should be lowest cell in valley
+                    outarray[Y == yi, X == xi] = DEM[Y == yi, X == xi] - \
+                                                 np.nanmin(DEM[:, X == xi])
+        volume = np.nansum(outarray)/1E6 # mm cells to m, check DEM height.
+        vol.append(volume)
+volumes = np.array(vol)
+depths = volumes/areas
 
-data['Runtime_seconds'] = runtimes_seconds
-data['Wait_time_seconds'] = waiting
-data.to_csv('Landslides.txt')
+
+
+##########
+# OUTPUT #
+##########
+
+outdata = pd.DataFrame()
+outdata['x_center [m]'] = x_center
+outdata['y_center [m]'] = y_center
+outdata['width [m]'] = widths
+outdata['length [m]'] = lengths
+outdata['depth [m]'] = depths
+outdata['area [m2]'] = areas
+outdata['semi-major axis length [m]'] = semimajor_axes
+outdata['semi-minor axis length [m]'] = semiminor_axes
+outdata['angle: semi-major axis to horizontal [deg]'] = \
+    angles_semimajor_axis_to_horizontal # not necessarily CCW...
+outdata['volume [m3]'] = volumes
+outdata['runtime [s]'] = lstime
+outdata['wait time [s]'] = waiting
+
+outdata.to_csv('Landslides.txt', index_label='index')
+
 
 
 
