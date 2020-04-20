@@ -104,10 +104,10 @@ def plFit(x, a, b):
 popt, pcov = curve_fit(plFit, data['area [m2]'], data['volume [m3]'])
 
 plt.figure(figsize=(6.4,4.8*.85)) # new default is 6.4, 4.8
-plt.loglog(data['area [m2]'], data['volume [m3]'], marker='o', color = '0', alpha=.2, linestyle='None')
+plt.loglog(data['area [m2]'], data['volume [m3]'], marker='o', color = '0', alpha=.2, linestyle='None', markeredgewidth=0)
 _x = np.logspace( np.log10(plt.xlim()[0]), np.log10(plt.xlim()[1]), 100 )
 plt.loglog(_x, plFit(_x, *popt), '-', color='.75', linewidth=2)
-plt.ylabel('Landslide volume $V$ [m$^{-2}$]', fontsize=16)
+plt.ylabel('Landslide volume $V$ [m$^3$]', fontsize=16)
 plt.xlabel('Landslide area $A$ [m$^2$]', fontsize=16)
 plt.tick_params(axis='both', which='major', labelsize=12)
 plt.text(1E-2, 4E-6, '$V$ = '+'%.2f' %popt[0]+'$A^{'+'%.2f' %popt[1]+'}$', fontsize=16)
