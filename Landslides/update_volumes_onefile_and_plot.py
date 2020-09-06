@@ -101,7 +101,7 @@ ax = plt.gca()
 plt.ylabel('Probability density [Pa$^{-1}$, m$^{-1}$]', fontsize=16)
 plt.xlabel('Landslide cohesion at failure [Pa]', fontsize=16)
 plt.tick_params(axis='both', which='major', labelsize=12)
-plt.xlim(0, ax.get_xlim()[-1])
+plt.xlim(0, 2500) # ax.get_xlim()[-1])
 plt.legend()
 # Equivalent landslide width
 #plt.twiny()
