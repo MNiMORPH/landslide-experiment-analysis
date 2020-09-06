@@ -12,29 +12,18 @@ from shapely.geometry import Point
 import pandas as pd
 plt.ion()
 
-_save = True
+_save = False
 
-def recursive_glob(rootdir='.', pattern='*'):
-	"""Search recursively for files matching a specified pattern.
-	
-	Adapted from http://stackoverflow.com/questions/2186525/use-a-glob-to-find-files-recursively-in-python
-	"""
-	matches = []
-	for root, dirnames, filenames in os.walk(rootdir):
-	  for filename in fnmatch.filter(filenames, pattern):
-		  matches.append(os.path.join(root, filename))
-	return matches
-
+# Within experiment data folder
 runtimes = pd.read_csv('runtime.txt', sep='\t')
-
-filenames = recursive_glob(rootdir='.', pattern='Landslides.txt')
+filenames = glob.glob(pathname='*/Landslides.txt', recursive=True)
 
 frames = []
 for filename in filenames:
     frames.append(pd.read_csv(filename))
 
 for frame in frames:
-    print np.max(frame['runtime [s]'])/3600.
+    print( np.max(frame['runtime [s]'])/3600. )
 
 data = pd.concat(frames)
 
