@@ -33,8 +33,7 @@ W = data['width [m]']
 # Cohesion = shear strength
 C_slide_trapezoid = rho * g * (W - H/(2*np.tan(alpha))) * np.sin(alpha) \
                            * (np.sin(alpha) - mu*np.cos(alpha))
-C_slide_triangle = (rho * g * W**2 * (np.sin(alpha) - mu*np.cos(alpha))) \
-                            / (2 * (H**2 * W**2)**.5)
+C_slide_triangle = rho * g * W * H * (H - mu*W) / (H**2 + W**2)
 C_slide = C_slide_trapezoid.copy()
 triangular_failures = H > (W*np.tan(alpha))
 print( np.sum(triangular_failures) / float(len(triangular_failures)) )
@@ -82,8 +81,8 @@ plt.loglog(C_slide[triangular_failures], TS_topple[triangular_failures], 'k^', a
 plt.xlim(5E0,2E4)
 plt.ylim(5E0,2E4)
 plt.loglog(_x, _y, 'k-', linewidth=2)
-plt.xlabel('Cohesion for slide failure [Pa]', fontsize=16)
-plt.ylabel('Tensile strength for topple failure [Pa]', fontsize=16)
+plt.xlabel('Driving shear stress minus fritional resistance\n(i.e., stress contributing against cohesion) [Pa]', fontsize=16)
+plt.ylabel('Stress contributing towards topple [Pa]', fontsize=16)
 plt.legend()
 plt.tight_layout()
 
